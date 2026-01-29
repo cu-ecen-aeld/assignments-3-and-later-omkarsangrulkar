@@ -10,8 +10,13 @@ jobs:
         container: cuaesd/aesd-autotest:24-unit-test
         runs-on: self-hosted
         steps:
-          - uses: actions/checkout@v2
-          - name: Checkout submodules
-            run : git submodule update --init --recursive
+          - uses: actions/checkout@v3
+          
+          - name: Initialize submodules (skip broken Unity)
+            run: |
+              git config --global --add safe.directory /__w/assignment-2-omkarsangrulkar/assignment-2-omkarsangrulkar
+              git config --global --add safe.directory /__w/assignment-2-omkarsangrulkar/assignment-2-omkarsangrulkar/assignment-autotest
+              git submodule update --init assignment-autotest
+              
           - name: Run unit test
             run: ./unit-test.sh
