@@ -1,8 +1,19 @@
-*.o
-writer
-Test_*_Runner.c
+# Build artifacts
 build/
-crosstool-ng
-aesd-build
+*_Runner.c
+*.o
+*.a
+*.so
+writer
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+
+# Editor files
 .vscode/
-test.sh.log
+.idea/
+*.swp
+*~
+.DS_Store
