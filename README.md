@@ -23,8 +23,10 @@ git submodule update --init --recursive
 ```
 to synchronize after cloning and before starting each assignment, as discussed in the assignment instructions.
 
-As a part of the assignment instructions, you will setup your assignment repo to perform automated testing using github actions.  See [this page](https://github.com/cu-ecen-aeld/aesd-assignments/wiki/Setting-up-Github-Actions) for details.
+As a part of the assignment instructions, you will setup your assignment repo to perform automated testing using github actions.  See [this page](https://github.com/cu-ecen-aeld/aesd-
+assignments/wiki/Setting-up-Github-Actions) for details.
 
+I have used LLM for this Assignment: https://claude.ai/share/fad12c43-b175-40c2-acf7-961e21692008
 Note that the unit tests will fail on this repository, since assignments are not yet implemented.  That's your job :) 
 
 
