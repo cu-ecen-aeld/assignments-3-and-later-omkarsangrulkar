@@ -32,7 +32,7 @@ echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
 rm -rf "${WRITEDIR}"
 
 # create $WRITEDIR if not assignment1
-assignment=$(cat ../conf/assignment.txt)
+assignment=$(cat conf/assignment.txt)
 
 if [ $assignment != 'assignment1' ]
 then
@@ -48,9 +48,9 @@ then
 		exit 1
 	fi
 fi
-#echo "Removing the old writer utility and compiling as a native application"
-make clean
-make
+
+# Note: make clean and make steps removed for assignment 3 part 1
+# Cross-compile make step will be added in assignment 3 part 2
 
 for i in $( seq 1 $NUMFILES)
 do
