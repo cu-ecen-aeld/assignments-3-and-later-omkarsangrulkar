@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 case "$1" in
     start)
@@ -7,11 +8,12 @@ case "$1" in
         ;;
     stop)
         echo "Stopping aesdsocket"
-        start-stop-daemon -K -n aesdsocket
+        start-stop-daemon -K -n aesdsocket -s TERM
         ;;
     *)
         echo "Usage: $0 {start|stop}"
         exit 1
+        ;;
 esac
 
 exit 0
