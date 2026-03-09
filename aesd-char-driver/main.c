@@ -154,11 +154,10 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
         /* Save the buffptr of the entry about to be evicted BEFORE add overwrites it */
         {
-            struct aesd_buffer_entry evicted = {0};
-            if (aesd_circular_buffer_add_entry(&dev->buffer, &new_entry, &evicted)) {
-                if (evicted.buffptr)
-                    kfree((void *)evicted.buffptr);
-            }
+            const struct aesd_buffer_entry *evicted =
+                aesd_circular_buffer_add_entry(&dev->buffer, &new_entry);
+            if (evicted && evicted->buffptr)
+                kfree((void *)evicted->buffptr);
         }
 
         /* Remove the consumed command from partial buffer */
