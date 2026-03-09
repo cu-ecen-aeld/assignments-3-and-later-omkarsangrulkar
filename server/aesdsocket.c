@@ -17,6 +17,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <sys/ioctl.h>
+#include "../aesd-char-driver/aesd_ioctl.h"
+
 #define PORT 9000
 #define BUFFER_SIZE 1024
 
@@ -195,11 +198,78 @@ static void *client_thread_func(void *arg)
             pthread_mutex_lock(&file_mutex);
 
 #if USE_AESD_CHAR_DEVICE
-            /* Open char device fresh for each write, close after */
-            int data_fd = open(DATA_FILE, O_WRONLY);
+            /* Check for AESDCHAR_IOCSEEKTO:X,Y command */
+            if (strncmp(acc, "AESDCHAR_IOCSEEKTO:", 19) == 0) {
+                unsigned int x = 0, y = 0;
+                /* acc may not be null-terminated, so copy the packet first */
+                char *pkt_copy = strndup(acc, pkt_len);
+                if (pkt_copy && sscanf(pkt_copy + 19, "%u,%u", &x, &y) == 2) {
+                    struct aesd_seekto seekto = {
+                        .write_cmd        = x,
+                        .write_cmd_offset = y,
+                    };
+                    /* Open with O_RDWR so same fd can ioctl then read */
+                    int data_fd = open(DATA_FILE, O_RDWR);
+                    if (data_fd < 0) {
+                        syslog(LOG_ERR, "open data file failed: %s", strerror(errno));
+                        free(pkt_copy);
+                        pthread_mutex_unlock(&file_mutex);
+                        goto out;
+                    }
+                    if (ioctl(data_fd, AESDCHAR_IOCSEEKTO, &seekto) != 0) {
+                        syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %s", strerror(errno));
+                    }
+                    /* Read from the seeked position and send back — same fd */
+                    ssize_t bytes_read;
+                    while ((bytes_read = read(data_fd, buffer, sizeof(buffer))) > 0) {
+                        if (send_all(client_fd, buffer, (size_t)bytes_read) != 0) {
+                            syslog(LOG_ERR, "send failed: %s", strerror(errno));
+                            break;
+                        }
+                    }
+                    close(data_fd);
+                }
+                free(pkt_copy);
+                pthread_mutex_unlock(&file_mutex);
+            } else {
+                /* Normal path: write to device, then read all and send back */
+                int data_fd = open(DATA_FILE, O_RDWR);
+                if (data_fd < 0) {
+                    syslog(LOG_ERR, "open data file failed: %s", strerror(errno));
+                    pthread_mutex_unlock(&file_mutex);
+                    goto out;
+                }
+                ssize_t off = 0;
+                while (off < (ssize_t)pkt_len) {
+                    ssize_t w = write(data_fd, acc + off, pkt_len - (size_t)off);
+                    if (w <= 0) {
+                        syslog(LOG_ERR, "write failed: %s", strerror(errno));
+                        break;
+                    }
+                    off += w;
+                }
+                close(data_fd);
+
+                data_fd = open(DATA_FILE, O_RDONLY);
+                if (data_fd < 0) {
+                    syslog(LOG_ERR, "open data file for read failed: %s", strerror(errno));
+                    pthread_mutex_unlock(&file_mutex);
+                    goto out;
+                }
+                ssize_t bytes_read;
+                while ((bytes_read = read(data_fd, buffer, sizeof(buffer))) > 0) {
+                    if (send_all(client_fd, buffer, (size_t)bytes_read) != 0) {
+                        syslog(LOG_ERR, "send failed: %s", strerror(errno));
+                        break;
+                    }
+                }
+                if (bytes_read < 0)
+                    syslog(LOG_ERR, "read failed: %s", strerror(errno));
+                close(data_fd);
+                pthread_mutex_unlock(&file_mutex);
+            }
 #else
             int data_fd = open(DATA_FILE, O_WRONLY | O_CREAT | O_APPEND, 0644);
-#endif
             if (data_fd < 0) {
                 syslog(LOG_ERR, "open data file failed: %s", strerror(errno));
                 pthread_mutex_unlock(&file_mutex);
@@ -216,12 +286,7 @@ static void *client_thread_func(void *arg)
             }
             close(data_fd);
 
-            /* Read full content and send back */
-#if USE_AESD_CHAR_DEVICE
             data_fd = open(DATA_FILE, O_RDONLY);
-#else
-            data_fd = open(DATA_FILE, O_RDONLY);
-#endif
             if (data_fd < 0) {
                 syslog(LOG_ERR, "open data file for read failed: %s", strerror(errno));
                 pthread_mutex_unlock(&file_mutex);
@@ -234,11 +299,11 @@ static void *client_thread_func(void *arg)
                     break;
                 }
             }
-            if (bytes_read < 0) {
+            if (bytes_read < 0)
                 syslog(LOG_ERR, "read failed: %s", strerror(errno));
-            }
             close(data_fd);
             pthread_mutex_unlock(&file_mutex);
+#endif
 
             size_t remaining = acc_len - pkt_len;
             if (remaining > 0) {
